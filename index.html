@@ -223,357 +223,385 @@
       </span>
     </footer>
     <script>
-      /* CONFIG */
-      function getQueryParam(name, defaultValue) {
-        const params = new URLSearchParams(window.location.search);
-        const v = params.get(name);
-        return v !== null ? Number(v) : defaultValue;
-      }
+      /**
+       * Drop-in refactor. Same behavior. Clear structure. No globals leaked.
+       * Why: isolate state, separate pure logic from DOM, centralize config, and make recompute idempotent.
+       */
+      (function PyramidGame() {
+        /* ------------------------------- Config ------------------------------- */
+        const SELECTORS = {
+          triangle: "#triangle",
+          solutionPanel: "#solution-panel",
+          copyBtn: "#copy-solution",
+          indicator: "#solution-indicator",
+          solvDifficulty: "#solv-difficulty",
+          solvScore: "#solv-score",
+          solvTime: "#solv-time",
+          solvCope: "#solv-cope",
+        };
 
-      const SIZE = getQueryParam("size", 4);
-      const MINIMUM_APEX_VALUE = [
-        1, 3, 8, 20, 43, 98, 212, 465, 1000, 2144, 4497, 9504, 19872, 41455,
-        85356, 178630, 363467, 757085, 1541998, 3183600, 6515066, 13357593,
-        27432649, 55914902, 114683858, 233517515, 478061719, 972479046,
-        1986013932,
-      ];
-      const APEX_TARGET_VALUE = getQueryParam(
-        "apexTarget",
-        Math.floor((1 + Math.random()) * MINIMUM_APEX_VALUE[SIZE])
-      );
-      const START_TIME = new Date();
-      const MAXIMUM_UNADJUSTED_SCORE = 1000;
-      const MINIMUM_UNADJUSTED_SCORE = 1;
+        const MINIMUM_APEX_VALUE = [
+          1, 3, 8, 20, 43, 98, 212, 465, 1000, 2144, 4497, 9504, 19872, 41455,
+          85356, 178630, 363467, 757085, 1541998, 3183600, 6515066, 13357593,
+          27432649, 55914902, 114683858, 233517515, 478061719, 972479046,
+          1986013932,
+        ];
 
-      const EASY_SIZE = 4;
-      const MEDIUM_SIZE = 7;
-      const HARD_SIZE = 11;
-      const GODLIKE_SIZE = 16;
+        const SCORE = { max: 1000, min: 1 };
 
-      const getDifficultyText = function (size) {
-        if (size <= EASY_SIZE) {
-          return `Easy (${size})`;
-        } else if (size <= MEDIUM_SIZE) {
-          return `Medium (${size})`;
-        } else if (size <= HARD_SIZE) {
-          return `Hard (${size})`;
-        } else if (size <= GODLIKE_SIZE) {
-          return `Godlike (${size})`;
-        } else {
-          return `Impossible (${size})`;
-        }
-      };
-
-      const COPE1 = 3;
-      const COPE2 = 8;
-      const COPE3 = 20;
-
-      const getCopeText = function (cope) {
-        if (cope <= COPE1) {
-          return `Flawless Execution (${cope})`;
-        } else if (cope <= COPE2) {
-          return `Great Execution (${cope})`;
-        } else if (cope <= COPE3) {
-          return `It's Not Going Well (${cope})`;
-        } else {
-          return `Didn't Even Try (${cope})`;
-        }
-      };
-
-      let LAST_COPYABLE_TEXT = "";
-
-      function getPyramidEmoji(height) {
-        const green = "🟩";
-        const white = "⬜";
-        const rows = [];
-
-        for (let i = 1; i <= height; i++) {
-          const block = i === 1 ? green : white;
-          rows.push(" ".repeat(height - i) + block.repeat(i));
-        }
-
-        return rows.join("\n");
-      }
-
-      const makeTargetValue = (r, c) => {
-        if (r === SIZE - 1 && c === 0) {
-          return APEX_TARGET_VALUE;
-        }
-        // if (r === SIZE - 3 && c === 2) {
-        //   return Math.floor(APEX_TARGET_VALUE/10);
-        // }
-        return null;
-      };
-
-      /* DATA MODEL */
-      const cells = []; // bottom→top, each cell: {value, targetValue, el}
-
-      const binomialCoefficient = (n, k) => {
-        if (Number.isNaN(n) || Number.isNaN(k)) return NaN;
-        if (k < 0 || k > n) return 0;
-        if (k === 0 || k === n) return 1;
-        if (k === 1 || k === n - 1) return n;
-        if (n - k < k) k = n - k;
-
-        let res = n;
-        for (let i = 2; i <= k; i++) res *= (n - i + 1) / i;
-        return Math.round(res);
-      };
-
-      /* BUILD DOM + MODEL */
-      (function init() {
-        const container = document.getElementById("triangle");
-
-        // create bottom row first
-        const bottomRow = [];
-        const bottomDiv = document.createElement("div");
-        bottomDiv.className = "row";
-        for (let i = 0; i < SIZE; i++) {
-          const inp = document.createElement("input");
-          inp.type = "number";
-          inp.min = "1";
-          inp.step = "1";
-          inp.value = "1";
-          inp.className = "input-cell";
-
-          const cell = {
-            value: 1,
-            targetValue: makeTargetValue(0, i),
-            el: inp,
-          };
-          bottomRow.push(cell);
-          bottomDiv.appendChild(inp);
-
-          inp.addEventListener("input", () => {
-            const raw = inp.value.trim();
-
-            // Only update state if raw is a positive integer
-            if (/^[1-9]\d*$/.test(raw)) {
-              cell.value = Number(raw);
-              recompute();
-            }
-
-            // Otherwise, allow the user to type freely (no state change yet)
-          });
-
-          inp.addEventListener("blur", () => {
-            // On blur, enforce valid value
-            let raw = inp.value.trim();
-            if (!/^[1-9]\d*$/.test(raw)) raw = "1";
-            cell.value = Number(raw);
-            inp.value = raw;
-            recompute();
-          });
-        }
-        cells.push(bottomRow);
-        container.appendChild(bottomDiv);
-
-        // build upper rows (structure only, values filled later)
-        while (cells[cells.length - 1].length > 1) {
-          const prev = cells[cells.length - 1];
-          const next = [];
-          const div = document.createElement("div");
-          div.className = "row";
-
-          for (let j = 0; j < prev.length - 1; j++) {
-            const cellDiv = document.createElement("div");
-            cellDiv.className = "cell";
-            const cell = {
-              value: 0,
-              targetValue: makeTargetValue(cells.length, j),
-              el: cellDiv,
-            };
-            next.push(cell);
-            div.appendChild(cellDiv);
-          }
-          cells.push(next);
-          container.prepend(div);
-        }
-
-        recompute();
-      })();
-
-      document.getElementById("copy-solution").addEventListener("click", () => {
-        const text = LAST_COPYABLE_TEXT || "No metrics available.";
-        const tryModern = navigator.clipboard?.writeText
-          ? navigator.clipboard.writeText(text)
-          : Promise.reject();
-
-        (tryModern || Promise.reject()).catch(() => {
-          const ta = document.createElement("textarea");
-          ta.value = text;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          ta.remove();
-        });
-      });
-
-      /* RECOMPUTE VALUES + STYLING */
-      function recompute() {
-        // compute triangle values
-        for (let r = 1; r < cells.length; r++) {
-          const row = cells[r];
-          const below = cells[r - 1];
-          for (let c = 0; c < row.length; c++) {
-            row[c].value = below[c].value + below[c + 1].value;
-          }
-        }
-
-        // flatten list of values
-        const all = cells.flat();
-        const counts = new Map();
-        for (const cell of all) {
-          counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
-        }
-
-        // apply colors + text
-        for (const row of cells) {
-          for (const cell of row) {
-            const v = cell.value;
-            const dup = counts.get(v) > 1;
-            const missingTargetValue =
-              cell.targetValue != null && v != cell.targetValue;
-            const hasTargetValue =
-              cell.targetValue != null && v === cell.targetValue;
-            const el = cell.el;
-
-            el.classList.remove("red", "green", "orange");
-            el.textContent = v;
-
-            // Remove old hints
-            const hint = cell.el.querySelector(".target-hint");
-            if (hint) hint.remove();
-
-            // Add hint if targetValue exists
-            if (cell.targetValue != null) {
-              const h = document.createElement("div");
-              h.className = "target-hint";
-              h.textContent = cell.targetValue;
-              cell.el.appendChild(h);
-            }
-
-            if (el.tagName === "INPUT") el.value = v;
-
-            if (dup) {
-              el.classList.add("red");
-            } else if (hasTargetValue) {
-              el.classList.add("green");
-            } else if (missingTargetValue) {
-              el.classList.add("orange");
-            }
-          }
-        }
-
-        const solved = isSolutionFound();
-        const el = document.getElementById("solution-indicator");
-        if (solved) {
-          el.textContent = "✔ Solution Found";
-          el.style.color = "green";
-        } else {
-          el.textContent = "";
-        }
-
-        if (solved) {
-          const vals = provideSolutionValues(cells);
-          if (vals) updateSolutionPanel(vals);
-        } else {
-          hideSolutionPanel();
-        }
-
-        const btn = document.getElementById("copy-solution");
-        if (btn) btn.hidden = !solved;
-      }
-
-      function isSolutionFound() {
-        const all = cells.flat();
-
-        // 1) No duplicates
-        const counts = new Map();
-        for (const cell of all) {
-          counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
-        }
-        for (const count of counts.values()) {
-          if (count > 1) return false;
-        }
-
-        // 2) Every targeted cell is satisfied
-        for (const cell of all) {
-          if (cell.targetValue != null && cell.value !== cell.targetValue) {
-            return false;
-          }
-        }
-
-        return true;
-      }
-
-      function provideSolutionValues(cells) {
-        // time to solve will be a factor
-        const differenceInMilliseconds = new Date() - START_TIME;
-        const differenceInSeconds = Math.floor(differenceInMilliseconds / 1000);
-
-        // the maximum of the two outermost input values
-        // const cope = Math.max(
-        //   cells[0][0].value,
-        //   cells[0][cells[0].length - 1].value
-        // );
-
-        // encourages proportional spread of inputs
-        // as opposed to adjusting a single value, especially on the sides (lazy)
-        const cope =
-          cells[0].reduce((sum, cell, idx) => {
-            return sum + cell.value / binomialCoefficient(SIZE, idx);
-          }, 0) - SIZE; // SIZE = minimum theoretical cope
-
-        // time * cope = badness
-        const badness = cope * differenceInSeconds;
-
-        // but this is going in a divisor so it can't decelerate the score too rapidly
-        const logBadness = Math.max(1, Math.log10(badness));
-
-        // also we need to account for the difficulty
-        // T(n), (number of squares that should have unique values)
-        const difficultyAdjustment = ((SIZE + 1) * SIZE) / 2;
-
-        // between min and max score
-        const unadjustedScore = Math.floor(
-          MINIMUM_UNADJUSTED_SCORE +
-            (MAXIMUM_UNADJUSTED_SCORE - MINIMUM_UNADJUSTED_SCORE) / logBadness
+        const SIZE = getQueryParam("size", 4);
+        const APEX_TARGET_VALUE = getQueryParam(
+          "apexTarget",
+          Math.floor((1 + Math.random()) * MINIMUM_APEX_VALUE[SIZE])
         );
 
-        // the adjusted score scales up quadratically with size
-        const score = unadjustedScore * difficultyAdjustment;
-
-        return {
-          cope: getCopeText(Math.round(cope * 10) / 10),
-          time: `${differenceInSeconds}s`,
-          score: score,
-          size: getDifficultyText(SIZE),
+        const DIFFICULTY_THRESHOLDS = {
+          easy: 4,
+          medium: 7,
+          hard: 11,
+          godlike: 16,
         };
-      }
 
-      function updateSolutionPanel(vals) {
-        const panel = document.getElementById("solution-panel");
-        document.getElementById("solv-difficulty").textContent = vals.size;
-        document.getElementById("solv-score").textContent = vals.score;
-        document.getElementById("solv-time").textContent = vals.time;
-        document.getElementById("solv-cope").textContent = vals.cope;
+        /* ------------------------------ State ------------------------------- */
+        const START_TIME = new Date();
+        let LAST_COPYABLE_TEXT = "";
 
-        LAST_COPYABLE_TEXT =
-          getPyramidEmoji(SIZE) +
-          "\n" +
-          `Difficulty: ${vals.size}\n` +
-          `Score: ${vals.score}\n` +
-          `Time: ${vals.time}\n` +
-          `Cope: ${vals.cope}`;
+        // Model: bottom→top. Each cell: { value, targetValue, el }
+        /** @type {Array<Array<{value:number,targetValue:number|null,el:HTMLElement}>>} */
+        const cells = [];
 
-        panel.hidden = false;
-      }
+        /* --------------------------- Pure Utilities -------------------------- */
+        function getQueryParam(name, defaultValue) {
+          const params = new URLSearchParams(window.location.search);
+          const v = params.get(name);
+          return v !== null ? Number(v) : defaultValue;
+        }
 
-      function hideSolutionPanel() {
-        document.getElementById("solution-panel").hidden = true;
-        LAST_COPYABLE_TEXT = "";
-      }
+        function binomialCoefficient(n, k) {
+          if (Number.isNaN(n) || Number.isNaN(k)) return NaN;
+          if (k < 0 || k > n) return 0;
+          if (k === 0 || k === n) return 1;
+          if (k === 1 || k === n - 1) return n;
+          if (n - k < k) k = n - k;
+          let res = n;
+          for (let i = 2; i <= k; i++) res *= (n - i + 1) / i;
+          return Math.round(res);
+        }
+
+        function getDifficultyText(size) {
+          const { easy, medium, hard, godlike } = DIFFICULTY_THRESHOLDS;
+          if (size <= easy) return `Easy (${size})`;
+          if (size <= medium) return `Medium (${size})`;
+          if (size <= hard) return `Hard (${size})`;
+          if (size <= godlike) return `Godlike (${size})`;
+          return `Impossible (${size})`;
+        }
+
+        function getCopeText(cope) {
+          // Why: reinforce proportional spread of inputs. Thresholds preserve original UX.
+          const COPE1 = 3;
+          const COPE2 = 8;
+          const COPE3 = 20;
+          if (cope <= COPE1) return `Flawless Execution (${cope})`;
+          if (cope <= COPE2) return `Great Execution (${cope})`;
+          if (cope <= COPE3) return `It's Not Going Well (${cope})`;
+          return `Didn't Even Try (${cope})`;
+        }
+
+        function getPyramidEmoji(height) {
+          const green = "🟩";
+          const white = "⬜";
+          const rows = [];
+          for (let i = 1; i <= height; i++) {
+            const block = i === 1 ? green : white;
+            rows.push(" ".repeat(height - i) + block.repeat(i));
+          }
+          return rows.join("\n");
+        }
+
+        function makeTargetValue(r, c) {
+          // Why: only the apex is constrained by default. Keep hook for future constraints.
+          if (r === SIZE - 1 && c === 0) return APEX_TARGET_VALUE;
+          return null;
+        }
+
+        /* --------------------------- DOM References -------------------------- */
+        const $ = (sel) => document.querySelector(sel);
+
+        const DOM = {
+          get triangle() {
+            return $(SELECTORS.triangle);
+          },
+          get panel() {
+            return $(SELECTORS.solutionPanel);
+          },
+          get copyBtn() {
+            return $(SELECTORS.copyBtn);
+          },
+          get indicator() {
+            return $(SELECTORS.indicator);
+          },
+          get solvDifficulty() {
+            return $(SELECTORS.solvDifficulty);
+          },
+          get solvScore() {
+            return $(SELECTORS.solvScore);
+          },
+          get solvTime() {
+            return $(SELECTORS.solvTime);
+          },
+          get solvCope() {
+            return $(SELECTORS.solvCope);
+          },
+        };
+
+        /* --------------------------- Build UI + Model ------------------------ */
+        function buildBottomRow() {
+          const row = [];
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "row";
+
+          for (let i = 0; i < SIZE; i++) {
+            const inp = document.createElement("input");
+            inp.type = "number";
+            inp.min = "1";
+            inp.step = "1";
+            inp.value = "1";
+            inp.className = "input-cell";
+
+            const cell = {
+              value: 1,
+              targetValue: makeTargetValue(0, i),
+              el: inp,
+            };
+            row.push(cell);
+            rowDiv.appendChild(inp);
+
+            // Why: allow free typing, apply changes only on valid integer or on blur.
+            inp.addEventListener("input", () => {
+              const raw = inp.value.trim();
+              if (/^[1-9]\d*$/.test(raw)) {
+                cell.value = Number(raw);
+                recompute();
+              }
+            });
+
+            inp.addEventListener("blur", () => {
+              let raw = inp.value.trim();
+              if (!/^[1-9]\d*$/.test(raw)) raw = "1";
+              cell.value = Number(raw);
+              inp.value = raw;
+              recompute();
+            });
+          }
+
+          cells.push(row);
+          DOM.triangle.appendChild(rowDiv);
+        }
+
+        function buildUpperRows() {
+          // Build structure topward. Values will be filled by recompute.
+          while (cells[cells.length - 1].length > 1) {
+            const prev = cells[cells.length - 1];
+            const next = [];
+            const div = document.createElement("div");
+            div.className = "row";
+
+            for (let j = 0; j < prev.length - 1; j++) {
+              const cellDiv = document.createElement("div");
+              cellDiv.className = "cell";
+              const cell = {
+                value: 0,
+                targetValue: makeTargetValue(cells.length, j),
+                el: cellDiv,
+              };
+              next.push(cell);
+              div.appendChild(cellDiv);
+            }
+            cells.push(next);
+            DOM.triangle.prepend(div);
+          }
+        }
+
+        /* ----------------------------- Compute ------------------------------- */
+        function recompute() {
+          // Fill triangle values from bottom to top
+          for (let r = 1; r < cells.length; r++) {
+            const row = cells[r];
+            const below = cells[r - 1];
+            for (let c = 0; c < row.length; c++) {
+              row[c].value = below[c].value + below[c + 1].value;
+            }
+          }
+
+          // Count for duplicate detection
+          const all = cells.flat();
+          const counts = new Map();
+          for (const cell of all)
+            counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
+
+          // Paint cells and add target hints
+          for (const row of cells) {
+            for (const cell of row) {
+              const v = cell.value;
+              const el = cell.el;
+              const dup = counts.get(v) > 1;
+              const hasTargetValue =
+                cell.targetValue != null && v === cell.targetValue;
+              const missingTarget =
+                cell.targetValue != null && v !== cell.targetValue;
+
+              el.classList.remove("red", "green", "orange");
+              el.textContent = v;
+
+              const oldHint = el.querySelector(".target-hint");
+              if (oldHint) oldHint.remove();
+
+              if (cell.targetValue != null) {
+                const h = document.createElement("div");
+                h.className = "target-hint";
+                h.textContent = cell.targetValue;
+                el.appendChild(h);
+              }
+
+              if (el.tagName === "INPUT") el.value = v;
+
+              if (dup) el.classList.add("red");
+              else if (hasTargetValue) el.classList.add("green");
+              else if (missingTarget) el.classList.add("orange");
+            }
+          }
+
+          const solved = isSolutionFound();
+          updateSolutionIndicator(solved);
+
+          if (solved) {
+            const vals = computeSolutionMetrics(cells);
+            if (vals) showSolutionPanel(vals);
+          } else {
+            hideSolutionPanel();
+          }
+
+          if (DOM.copyBtn) DOM.copyBtn.hidden = !solved;
+        }
+
+        function isSolutionFound() {
+          const all = cells.flat();
+
+          // No duplicates
+          const counts = new Map();
+          for (const cell of all)
+            counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
+          for (const count of counts.values()) if (count > 1) return false;
+
+          // All target cells satisfied
+          for (const cell of all)
+            if (cell.targetValue != null && cell.value !== cell.targetValue)
+              return false;
+
+          return true;
+        }
+
+        function computeSolutionMetrics(cells) {
+          const seconds = Math.floor((new Date() - START_TIME) / 1000);
+
+          // Why: discourage trivial edge-only tweaking by normalizing with binomial weights.
+          const copeRaw =
+            cells[0].reduce(
+              (sum, cell, idx) =>
+                sum + cell.value / binomialCoefficient(SIZE, idx),
+              0
+            ) - SIZE;
+
+          const badness = Math.max(
+            1,
+            Math.log10(Math.max(1, copeRaw * seconds))
+          );
+          const difficultyAdjustment = ((SIZE + 1) * SIZE) / 2;
+
+          const unadjusted = SCORE.min + (SCORE.max - SCORE.min) / badness;
+
+          const score = Math.floor(unadjusted) * difficultyAdjustment;
+
+          return {
+            cope: getCopeText(Math.round(copeRaw * 10) / 10),
+            time: `${seconds}s`,
+            score,
+            size: getDifficultyText(SIZE),
+          };
+        }
+
+        /* ---------------------------- UI Updates ----------------------------- */
+        function updateSolutionIndicator(solved) {
+          if (!DOM.indicator) return;
+          if (solved) {
+            DOM.indicator.textContent = "✔ Solution Found";
+            DOM.indicator.style.color = "green";
+          } else {
+            DOM.indicator.textContent = "";
+          }
+        }
+
+        function showSolutionPanel(vals) {
+          if (!DOM.panel) return;
+
+          DOM.solvDifficulty.textContent = vals.size;
+          DOM.solvScore.textContent = vals.score;
+          DOM.solvTime.textContent = vals.time;
+          DOM.solvCope.textContent = vals.cope;
+
+          LAST_COPYABLE_TEXT =
+            getPyramidEmoji(SIZE) +
+            "\n" +
+            `Difficulty: ${vals.size}\n` +
+            `Score: ${vals.score}\n` +
+            `Time: ${vals.time}\n` +
+            `Cope: ${vals.cope}`;
+
+          DOM.panel.hidden = false;
+        }
+
+        function hideSolutionPanel() {
+          if (!DOM.panel) return;
+          DOM.panel.hidden = true;
+          LAST_COPYABLE_TEXT = "";
+        }
+
+        function handleCopy() {
+          const text = LAST_COPYABLE_TEXT || "No metrics available.";
+          const modern = navigator.clipboard?.writeText
+            ? navigator.clipboard.writeText(text)
+            : Promise.reject();
+
+          (modern || Promise.reject()).catch(() => {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+          });
+        }
+
+        /* ------------------------------ Init ------------------------------- */
+        function init() {
+          buildBottomRow();
+          buildUpperRows();
+          recompute();
+
+          const btn = DOM.copyBtn;
+          if (btn) {
+            btn.removeEventListener("click", handleCopy); // idempotent
+            btn.addEventListener("click", handleCopy);
+          }
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
     </script>
   </body>
 </html>
