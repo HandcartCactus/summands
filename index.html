@@ -256,7 +256,7 @@
 
         const SCORE = { max: 1000, min: 1 };
 
-        const SIZE = getQueryParam("size", 4);
+        const SIZE = Math.max([getQueryParam("size", 4), MINIMUM_APEX_VALUE.length]);
         const APEX_TARGET_VALUE = getQueryParam(
           "apexTarget",
           Math.floor((1 + Math.random()) * MINIMUM_APEX_VALUE[SIZE])
