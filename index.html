@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Summands</title>
+    <style>
+      :root {
+        --cell: 60px;
+        --gap: 6px;
+      }
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      .row {
+        display: flex;
+        gap: var(--gap);
+        justify-content: center;
+        margin: 4px 0;
+      }
+      .cell {
+        width: var(--cell);
+        height: var(--cell);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #000;
+        border-radius: 4px;
+        font-size: 16px;
+        user-select: none;
+        background: #fafafa;
+      }
+      .input-cell {
+        background: #fff;
+        padding: 0;
+        border: 1px solid #000;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 16px;
+        width: var(--cell);
+        height: var(--cell);
+      }
+      .red {
+        background: #fbb !important;
+        border-color: #900 !important;
+      }
+      .green {
+        background: #bfb !important;
+        border-color: #090 !important;
+      }
+      .orange {
+        background: rgb(249, 215, 159) !important;
+        border-color: rgb(153, 74, 0) !important;
+      }
+
+      .cell,
+      .input-cell {
+        position: relative;
+      }
+
+      .target-hint {
+        position: absolute;
+        bottom: 2px;
+        right: 4px;
+        font-size: 10px;
+        opacity: 0.45;
+        pointer-events: none;
+      }
+
+      .solved-panel {
+        margin-top: 16px;
+        padding: 10px 12px;
+        border: 1px solid #0a0;
+        border-radius: 6px;
+        background: #f4fff4;
+        display: inline-flex;
+        gap: 16px;
+        font-size: 14px;
+      }
+      .solved-panel .label {
+        font-weight: 600;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .center-sol {
+        margin-top: 20px;
+        font-size: 20px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="triangle"></div>
+
+    <div id="solution-indicator" class="center-sol"></div>
+    <div id="solution-panel" hidden class="solved-panel">
+      <div class="metric">
+        <span class="label">Difficulty:</span>
+        <span id="solv-difficulty"></span>
+      </div>
+      <div class="metric">
+        <span class="label">Score:</span> <span id="solv-score"></span>
+      </div>
+      <div class="metric">
+        <span class="label">Time To Solve:</span> <span id="solv-time"></span>
+      </div>
+      <div class="metric">
+        <span class="label">Cope:</span> <span id="solv-cope"></span>
+      </div>
+      <button id="copy-solution" hidden>Copy Stats to Clipboard</button>
+    </div>
+
+    <div>
+      <h2>Instructions</h2>
+      <ul>
+        <li>Adjust the values in the cells at the bottom row.</li>
+        <li>
+          After the bottom row, each cell contains the sum of the two cells
+          immediately below it.
+        </li>
+        <li>
+          No two cells may share the same value. Duplicate values are
+          highlighted in <span class="red">red</span>.
+        </li>
+        <li>
+          Some cells must equal a certain target value, present in the
+          bottom-right corner of the cell. Cells which do not meet their target
+          values are <span class="orange">orange</span>. Cells meeting their
+          target values are <span class="green">green</span>.
+        </li>
+        <li>
+          The puzzle is complete when the target values are met and the value in
+          each cell is unique.
+        </li>
+      </ul>
+
+      <h2>Tips</h2>
+      <ul>
+        <li>
+          Points are reduced for distributing high values onto a single input,
+          esepecially on the edges (A.K.A. "cope"). The closer you are to
+          multiples of
+          <a href="https://en.wikipedia.org/wiki/Pascal%27s_triangle"
+            >Pascal's Triangle</a
+          >
+          (e.g. "1, 3, 3, 1" or "1, 4, 6, 4, 1"), the higher your score will be.
+        </li>
+
+        <li>The faster you solve the puzzle, the higher your score will be.</li>
+        <li>Bigger puzzles have higher score multipliers.</li>
+
+        <li>
+          Smaller target values are harder to solve, but result in lower cope
+          scores.
+        </li>
+        <li>Start by giving larger values to the innermost cells.</li>
+      </ul>
+
+      <h2>Credit</h2>
+      <p>
+        This game was originally inspired by the video
+        <a href="https://www.youtube.com/watch?v=cXAyLSWocR4"
+          >(A Number Pyramid Puzzle)</a
+        >
+        solved by the excellent
+        <a href="https://www.youtube.com/@DrBarker">Dr. Barker</a> on YouTube. I
+        was nerdsniped by this problem and found it oddly satisfying, so I felt
+        the urge to turn it into a game.
+      </p>
+      <p>
+        As far as I can tell, addition pyramids with unique entries aren't
+        exactly hot mathematics, so I was very fortunate to have stumbled into
+        <a href="https://oeis.org/A028307">A028307 on OEIS.org</a>, which gives
+        the minimum value for the apex of the addition pyramid with unique
+        entries. There does not appear to be a known closed form for this, so I
+        appreciate
+        <a href="https://oeis.org/wiki/User:Mauro_Fiorentini"
+          >Mauro Fiorentini</a
+        >
+        crunching the numbers on this
+        <a href="https://olympiads.win.tue.nl/imo/soviet/RusMath.html"
+          >Soviet competition problem (401)
+        </a>
+        from 1985. I needed these values to make the game work, and this saved
+        me from having to brute force sizes > 7.
+      </p>
+
+      <h2>Difficulties</h2>
+      <ul>
+        <li><a href="?size=4">Easy (4)</a></li>
+        <li>
+          <a href="?size=4&apexTarget=20">Easy (4, Dr. Barker's Problem)</a>
+        </li>
+        <li><a href="?size=7">Medium (7)</a></li>
+        <li><a href="?size=7&apexTarget=212">Medium (7) Challenge</a></li>
+        <li><a href="?size=11">Hard (11)</a></li>
+        <li><a href="?size=11&apexTarget=4497">Hard (11) Challenge</a></li>
+        <li><a href="?size=16">Godlike (16)</a></li>
+        <li><a href="?size=16&apexTarget=178630">Godlike (16) Challenge</a></li>
+      </ul>
+    </div>
+    <footer>
+      <span>
+        <a href="https://github.com/HandcartCactus/summands"
+          >This page is open-source and MIT licensed.
+          <svg
+            aria-hidden="true"
+            height="24"
+            viewBox="0 0 24 24"
+            version="1.1"
+            width="24"
+            data-view-component="true"
+            class="octicon octicon-mark-github"
+          >
+            <path
+              d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436.55.096.756-.233.756-.522 0-.262-.013-1.128-.013-2.049-2.764.509-3.479-.674-3.699-1.292-.124-.317-.66-1.293-1.127-1.554-.385-.207-.936-.715-.014-.729.866-.014 1.485.797 1.691 1.128.99 1.663 2.571 1.196 3.204.907.096-.715.385-1.196.701-1.471-2.448-.275-5.005-1.224-5.005-5.432 0-1.196.426-2.186 1.128-2.956-.111-.275-.496-1.402.11-2.915 0 0 .921-.288 3.024 1.128a10.193 10.193 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371 2.104-1.43 3.025-1.128 3.025-1.128.605 1.513.221 2.64.111 2.915.701.77 1.127 1.747 1.127 2.956 0 4.222-2.571 5.157-5.019 5.432.399.344.743 1.004.743 2.035 0 1.471-.014 2.654-.014 3.025 0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11Z"
+            ></path>
+          </svg>
+        </a>
+      </span>
+    </footer>
+    <script>
+      /* CONFIG */
+      function getQueryParam(name, defaultValue) {
+        const params = new URLSearchParams(window.location.search);
+        const v = params.get(name);
+        return v !== null ? Number(v) : defaultValue;
+      }
+
+      const SIZE = getQueryParam("size", 4);
+      const MINIMUM_APEX_VALUE = [
+        1, 3, 8, 20, 43, 98, 212, 465, 1000, 2144, 4497, 9504, 19872, 41455,
+        85356, 178630, 363467, 757085, 1541998, 3183600, 6515066, 13357593,
+        27432649, 55914902, 114683858, 233517515, 478061719, 972479046,
+        1986013932,
+      ];
+      const APEX_TARGET_VALUE = getQueryParam(
+        "apexTarget",
+        Math.floor((1 + Math.random()) * MINIMUM_APEX_VALUE[SIZE])
+      );
+      const START_TIME = new Date();
+      const MAXIMUM_UNADJUSTED_SCORE = 1000;
+      const MINIMUM_UNADJUSTED_SCORE = 1;
+
+      const EASY_SIZE = 4;
+      const MEDIUM_SIZE = 7;
+      const HARD_SIZE = 11;
+      const GODLIKE_SIZE = 16;
+
+      const getDifficultyText = function (size) {
+        if (size <= EASY_SIZE) {
+          return `Easy (${size})`;
+        } else if (size <= MEDIUM_SIZE) {
+          return `Medium (${size})`;
+        } else if (size <= HARD_SIZE) {
+          return `Hard (${size})`;
+        } else if (size <= GODLIKE_SIZE) {
+          return `Godlike (${size})`;
+        } else {
+          return `Impossible (${size})`;
+        }
+      };
+
+      const COPE1 = 3;
+      const COPE2 = 8;
+      const COPE3 = 20;
+
+      const getCopeText = function (cope) {
+        if (cope <= COPE1) {
+          return `Flawless Execution (${cope})`;
+        } else if (cope <= COPE2) {
+          return `Great Execution (${cope})`;
+        } else if (cope <= COPE3) {
+          return `It's Not Going Well (${cope})`;
+        } else {
+          return `Didn't Even Try (${cope})`;
+        }
+      };
+
+      let LAST_COPYABLE_TEXT = "";
+
+      function getPyramidEmoji(height) {
+        const green = "🟩";
+        const white = "⬜";
+        const rows = [];
+
+        for (let i = 1; i <= height; i++) {
+          const block = i === 1 ? green : white;
+          rows.push(" ".repeat(height - i) + block.repeat(i));
+        }
+
+        return rows.join("\n");
+      }
+
+      const makeTargetValue = (r, c) => {
+        if (r === SIZE - 1 && c === 0) {
+          return APEX_TARGET_VALUE;
+        }
+        // if (r === SIZE - 3 && c === 2) {
+        //   return Math.floor(APEX_TARGET_VALUE/10);
+        // }
+        return null;
+      };
+
+      /* DATA MODEL */
+      const cells = []; // bottom→top, each cell: {value, targetValue, el}
+
+      const binomialCoefficient = (n, k) => {
+        if (Number.isNaN(n) || Number.isNaN(k)) return NaN;
+        if (k < 0 || k > n) return 0;
+        if (k === 0 || k === n) return 1;
+        if (k === 1 || k === n - 1) return n;
+        if (n - k < k) k = n - k;
+
+        let res = n;
+        for (let i = 2; i <= k; i++) res *= (n - i + 1) / i;
+        return Math.round(res);
+      };
+
+      /* BUILD DOM + MODEL */
+      (function init() {
+        const container = document.getElementById("triangle");
+
+        // create bottom row first
+        const bottomRow = [];
+        const bottomDiv = document.createElement("div");
+        bottomDiv.className = "row";
+        for (let i = 0; i < SIZE; i++) {
+          const inp = document.createElement("input");
+          inp.type = "number";
+          inp.min = "1";
+          inp.step = "1";
+          inp.value = "1";
+          inp.className = "input-cell";
+
+          const cell = {
+            value: 1,
+            targetValue: makeTargetValue(0, i),
+            el: inp,
+          };
+          bottomRow.push(cell);
+          bottomDiv.appendChild(inp);
+
+          inp.addEventListener("input", () => {
+            const raw = inp.value.trim();
+
+            // Only update state if raw is a positive integer
+            if (/^[1-9]\d*$/.test(raw)) {
+              cell.value = Number(raw);
+              recompute();
+            }
+
+            // Otherwise, allow the user to type freely (no state change yet)
+          });
+
+          inp.addEventListener("blur", () => {
+            // On blur, enforce valid value
+            let raw = inp.value.trim();
+            if (!/^[1-9]\d*$/.test(raw)) raw = "1";
+            cell.value = Number(raw);
+            inp.value = raw;
+            recompute();
+          });
+        }
+        cells.push(bottomRow);
+        container.appendChild(bottomDiv);
+
+        // build upper rows (structure only, values filled later)
+        while (cells[cells.length - 1].length > 1) {
+          const prev = cells[cells.length - 1];
+          const next = [];
+          const div = document.createElement("div");
+          div.className = "row";
+
+          for (let j = 0; j < prev.length - 1; j++) {
+            const cellDiv = document.createElement("div");
+            cellDiv.className = "cell";
+            const cell = {
+              value: 0,
+              targetValue: makeTargetValue(cells.length, j),
+              el: cellDiv,
+            };
+            next.push(cell);
+            div.appendChild(cellDiv);
+          }
+          cells.push(next);
+          container.prepend(div);
+        }
+
+        recompute();
+      })();
+
+      document.getElementById("copy-solution").addEventListener("click", () => {
+        const text = LAST_COPYABLE_TEXT || "No metrics available.";
+        const tryModern = navigator.clipboard?.writeText
+          ? navigator.clipboard.writeText(text)
+          : Promise.reject();
+
+        (tryModern || Promise.reject()).catch(() => {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        });
+      });
+
+      /* RECOMPUTE VALUES + STYLING */
+      function recompute() {
+        // compute triangle values
+        for (let r = 1; r < cells.length; r++) {
+          const row = cells[r];
+          const below = cells[r - 1];
+          for (let c = 0; c < row.length; c++) {
+            row[c].value = below[c].value + below[c + 1].value;
+          }
+        }
+
+        // flatten list of values
+        const all = cells.flat();
+        const counts = new Map();
+        for (const cell of all) {
+          counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
+        }
+
+        // apply colors + text
+        for (const row of cells) {
+          for (const cell of row) {
+            const v = cell.value;
+            const dup = counts.get(v) > 1;
+            const missingTargetValue =
+              cell.targetValue != null && v != cell.targetValue;
+            const hasTargetValue =
+              cell.targetValue != null && v === cell.targetValue;
+            const el = cell.el;
+
+            el.classList.remove("red", "green", "orange");
+            el.textContent = v;
+
+            // Remove old hints
+            const hint = cell.el.querySelector(".target-hint");
+            if (hint) hint.remove();
+
+            // Add hint if targetValue exists
+            if (cell.targetValue != null) {
+              const h = document.createElement("div");
+              h.className = "target-hint";
+              h.textContent = cell.targetValue;
+              cell.el.appendChild(h);
+            }
+
+            if (el.tagName === "INPUT") el.value = v;
+
+            if (dup) {
+              el.classList.add("red");
+            } else if (hasTargetValue) {
+              el.classList.add("green");
+            } else if (missingTargetValue) {
+              el.classList.add("orange");
+            }
+          }
+        }
+
+        const solved = isSolutionFound();
+        const el = document.getElementById("solution-indicator");
+        if (solved) {
+          el.textContent = "✔ Solution Found";
+          el.style.color = "green";
+        } else {
+          el.textContent = "";
+        }
+
+        if (solved) {
+          const vals = provideSolutionValues(cells);
+          if (vals) updateSolutionPanel(vals);
+        } else {
+          hideSolutionPanel();
+        }
+
+        const btn = document.getElementById("copy-solution");
+        if (btn) btn.hidden = !solved;
+      }
+
+      function isSolutionFound() {
+        const all = cells.flat();
+
+        // 1) No duplicates
+        const counts = new Map();
+        for (const cell of all) {
+          counts.set(cell.value, (counts.get(cell.value) || 0) + 1);
+        }
+        for (const count of counts.values()) {
+          if (count > 1) return false;
+        }
+
+        // 2) Every targeted cell is satisfied
+        for (const cell of all) {
+          if (cell.targetValue != null && cell.value !== cell.targetValue) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      function provideSolutionValues(cells) {
+        // time to solve will be a factor
+        const differenceInMilliseconds = new Date() - START_TIME;
+        const differenceInSeconds = Math.floor(differenceInMilliseconds / 1000);
+
+        // the maximum of the two outermost input values
+        // const cope = Math.max(
+        //   cells[0][0].value,
+        //   cells[0][cells[0].length - 1].value
+        // );
+
+        // encourages proportional spread of inputs
+        // as opposed to adjusting a single value, especially on the sides (lazy)
+        const cope =
+          cells[0].reduce((sum, cell, idx) => {
+            return sum + cell.value / binomialCoefficient(SIZE, idx);
+          }, 0) - SIZE; // SIZE = minimum theoretical cope
+
+        // time * cope = badness
+        const badness = cope * differenceInSeconds;
+
+        // but this is going in a divisor so it can't decelerate the score too rapidly
+        const logBadness = Math.max(1, Math.log10(badness));
+
+        // also we need to account for the difficulty
+        // T(n), (number of squares that should have unique values)
+        const difficultyAdjustment = ((SIZE + 1) * SIZE) / 2;
+
+        // between min and max score
+        const unadjustedScore = Math.floor(
+          MINIMUM_UNADJUSTED_SCORE +
+            (MAXIMUM_UNADJUSTED_SCORE - MINIMUM_UNADJUSTED_SCORE) / logBadness
+        );
+
+        // the adjusted score scales up quadratically with size
+        const score = unadjustedScore * difficultyAdjustment;
+
+        return {
+          cope: getCopeText(Math.round(cope * 10) / 10),
+          time: `${differenceInSeconds}s`,
+          score: score,
+          size: getDifficultyText(SIZE),
+        };
+      }
+
+      function updateSolutionPanel(vals) {
+        const panel = document.getElementById("solution-panel");
+        document.getElementById("solv-difficulty").textContent = vals.size;
+        document.getElementById("solv-score").textContent = vals.score;
+        document.getElementById("solv-time").textContent = vals.time;
+        document.getElementById("solv-cope").textContent = vals.cope;
+
+        LAST_COPYABLE_TEXT =
+          getPyramidEmoji(SIZE) +
+          "\n" +
+          `Difficulty: ${vals.size}\n` +
+          `Score: ${vals.score}\n` +
+          `Time: ${vals.time}\n` +
+          `Cope: ${vals.cope}`;
+
+        panel.hidden = false;
+      }
+
+      function hideSolutionPanel() {
+        document.getElementById("solution-panel").hidden = true;
+        LAST_COPYABLE_TEXT = "";
+      }
+    </script>
+  </body>
+</html>
