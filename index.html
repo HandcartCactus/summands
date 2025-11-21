@@ -2,10 +2,71 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Summands</title>
+    <title>Summands – Unique Addition Pyramid Puzzle Game</title>
+    <!-- Basic SEO -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Summands is an interactive number pyramid puzzle: adjust the base row, keep all entries unique, hit target sums, and optimize your cope-based score."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://handcartcactus.github.io/summands/" />
 
+    <!-- Open Graph (for sharing + discovery) -->
+    <meta
+      property="og:title"
+      content="Summands – Unique Addition Pyramid Puzzle Game"
+    />
+    <meta
+      property="og:description"
+      content="Interactive addition pyramid puzzle with unique entries, target sums, and scoring based on time, difficulty, and cope."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://handcartcactus.github.io/summands/"
+    />
+    <!-- Change this to an actual image you host -->
+    <meta
+      property="og:image"
+      content="https://handcartcactus.github.io/summands/social-card.png"
+    />
 
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Summands – Unique Addition Pyramid Puzzle Game"
+    />
+    <meta
+      name="twitter:description"
+      content="Adjust the base row, watch the pyramid update, and hunt for low-cope solutions to this unique-number addition puzzle."
+    />
+    <meta
+      name="twitter:image"
+      content="https://handcartcactus.github.io/summands/social-card.png"
+    />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Game",
+        "name": "Summands",
+        "url": "https://handcartcactus.github.io/summands/",
+        "description": "Interactive addition pyramid puzzle with unique entries, target sums, and scoring based on time, difficulty, and solution elegance.",
+        "inLanguage": "en",
+        "author": {
+          "@type": "Person",
+          "name": "HandcartCactus"
+        }
+      }
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"
+    ></script>
 
     <style>
       :root {
@@ -162,7 +223,7 @@
         </li>
         <li>Start by giving larger values to the innermost cells.</li>
       </ul>
-      
+
       <h2>Credit</h2>
       <p>
         This game was originally inspired by the video
@@ -196,7 +257,9 @@
       <ul>
         <li><a href="?size=4">Easy (4)</a></li>
         <li>
-          <a href="?size=4&apexTarget=20">Easy (4) Challenge (A.K.A Dr. Barker's Problem)</a>
+          <a href="?size=4&apexTarget=20"
+            >Easy (4) Challenge (A.K.A Dr. Barker's Problem)</a
+          >
         </li>
         <li><a href="?size=7">Medium (7)</a></li>
         <li><a href="?size=7&apexTarget=212">Medium (7) Challenge</a></li>
@@ -206,43 +269,58 @@
         <li><a href="?size=16&apexTarget=178630">Godlike (16) Challenge</a></li>
       </ul>
       <h2>How Scores Are Calculated</h2>
-      <p>Scores are calculated using three factors which encourage real engagement with the puzzle: time to solve, the difficulty of the puzzle, and a factor called "cope".</p>
+      <p>
+        Scores are calculated using three factors which encourage real
+        engagement with the puzzle: time to solve, the difficulty of the puzzle,
+        and a factor called "cope".
+      </p>
       <h3>Cope</h3>
-        <p>
-          Values in the center of the base row have larger effects on the apex of the pyramid 
-          (compared to values at the edges of the base row) due to binomial effects from repeated addition. 
-          Values in the center of the base row also impact more cells, making them more likely to create duplicate values.
-          Often, it is possible to spike a value at the edge of the base row to meet the target value. 
-          This makes the puzzle too easy and must be discouraged. 
-          To encourage the use of center rows and reduce the total input values by relying on binomial effects, we create a factor called "cope".
-        </p>
-        <p>
-          Let \(n\) be the number of cells in the base row and let \(v_1, ..., v_n\) be the input values. 
-          We define the cope factor as the weighted sum of input values, minus an (lowest possible but invalid) minimum value, \(n\). 
-          The inverse binomial weights encourage heavier use of values in the center. 
-          $$\text{cope} = \sum_{k=0}^n \frac{v_k}{\binom{n}{k}} - n$$
-        </p>
+      <p>
+        Values in the center of the base row have larger effects on the apex of
+        the pyramid (compared to values at the edges of the base row) due to
+        binomial effects from repeated addition. Values in the center of the
+        base row also impact more cells, making them more likely to create
+        duplicate values. Often, it is possible to spike a value at the edge of
+        the base row to meet the target value. This makes the puzzle too easy
+        and must be discouraged. To encourage the use of center rows and reduce
+        the total input values by relying on binomial effects, we create a
+        factor called "cope".
+      </p>
+      <p>
+        Let \(n\) be the number of cells in the base row and let \(v_1, ...,
+        v_n\) be the input values. We define the cope factor as the weighted sum
+        of input values, minus an (lowest possible but invalid) minimum value,
+        \(n\). The inverse binomial weights encourage heavier use of values in
+        the center. $$\text{cope} = \sum_{k=0}^n \frac{v_k}{\binom{n}{k}} - n$$
+      </p>
       <h3>Unadjusted Scores</h3>
-        <p>
-          Because solutions with low cope take more time to find, our unadjusted score takes both cope and time to solve into account.
-          The ideal unadjusted score is between \(S_{min}=1\) and \(S_{max}=1000\), and should decrease asymptotically with higher values of cope or time to solve.
-          A direct product of both cope and time to solve was considered, but the score decreased too rapidly. Instead, the logarithm of the product was chosen as the variable used to decrease the score.
-        </p>
-        <p>
-          Let time to solve be \(\Delta_t\). The unadjusted score is then:
-          $$\text{unadjustedScore} = S_{min} + \frac{S_{max} - S_{min}}{\max\{\log_{10}(\text{cope} * \Delta_t),1\}}$$
-        </p>
+      <p>
+        Because solutions with low cope take more time to find, our unadjusted
+        score takes both cope and time to solve into account. The ideal
+        unadjusted score is between \(S_{min}=1\) and \(S_{max}=1000\), and
+        should decrease asymptotically with higher values of cope or time to
+        solve. A direct product of both cope and time to solve was considered,
+        but the score decreased too rapidly. Instead, the logarithm of the
+        product was chosen as the variable used to decrease the score.
+      </p>
+      <p>
+        Let time to solve be \(\Delta_t\). The unadjusted score is then:
+        $$\text{unadjustedScore} = S_{min} + \frac{S_{max} -
+        S_{min}}{\max\{\log_{10}(\text{cope} * \Delta_t),1\}}$$
+      </p>
       <h3>Adjusted Scores</h3>
-        <p>
-          To account for the size of the problem, we multiply the unadjusted score by the number of total cells:
-          $$\text{score} = \text{unadjustedScore} * \frac{n (n+1)}{2}$$
-          This means that a given score is at most \(S_{max} * \frac{n (n+1)}{2}\).
-        </p>
+      <p>
+        To account for the size of the problem, we multiply the unadjusted score
+        by the number of total cells: $$\text{score} = \text{unadjustedScore} *
+        \frac{n (n+1)}{2}$$ This means that a given score is at most \(S_{max} *
+        \frac{n (n+1)}{2}\).
+      </p>
       <h3>What Isn't Taken Into Account</h3>
-        <p>
-          Puzzles with lower values in target cells have far fewer solutions, and are therefore more challenging. I'm doing some research to see how to accurately account for this fact
-        </p>
-        
+      <p>
+        Puzzles with lower values in target cells have far fewer solutions, and
+        are therefore more challenging. I'm doing some research to see how to
+        accurately account for this fact
+      </p>
     </div>
     <footer>
       <span>
@@ -291,7 +369,10 @@
 
         const SCORE = { max: 1000, min: 1 };
 
-        const SIZE = Math.min(getQueryParam("size", 4), MINIMUM_APEX_VALUE.length);
+        const SIZE = Math.min(
+          getQueryParam("size", 4),
+          MINIMUM_APEX_VALUE.length
+        );
         const APEX_TARGET_VALUE = getQueryParam(
           "apexTarget",
           Math.floor((1 + Math.random()) * MINIMUM_APEX_VALUE[SIZE])
